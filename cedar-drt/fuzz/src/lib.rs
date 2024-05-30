@@ -38,12 +38,76 @@ pub use cedar_testing::cedar_test_impl::{
 use libfuzzer_sys::arbitrary::{self, Unstructured};
 use log::info;
 use miette::miette;
+use serde::Serialize;
+use serde_json::json;
+use serde_json::Value;
 use smol_str::ToSmolStr;
 use std::collections::HashSet;
 
 /// Times for cedar-policy authorization and validation.
 pub const RUST_AUTH_MSG: &str = "rust_auth (ns) : ";
 pub const RUST_VALIDATION_MSG: &str = "rust_validation (ns) : ";
+
+/// Test format for Tyche visualizer
+
+pub trait TycheFormat {
+    fn to_tyche(&self) -> TycheTest;
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self.to_tyche()).unwrap()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum FuzzOutcome {
+    Success,
+    Invalid,
+    Failure,
+}
+
+impl FuzzOutcome {
+    pub fn to_str(&self) -> &str {
+        match self {
+            FuzzOutcome::Success => "success",
+            FuzzOutcome::Invalid => "gave_up",
+            FuzzOutcome::Failure => "failure",
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TycheTest {
+    pub r#type: String,
+    pub status: String,
+    pub status_reason: String,
+    pub representation: String,
+    pub arguments: Value,
+    pub how_generated: String,
+    pub features: Value,
+    pub coverage: Value,
+    pub timing: Value,
+    pub metadata: Value,
+    pub property: String,
+    pub run_start: f64,
+}
+
+impl Default for TycheTest {
+    fn default() -> Self {
+        TycheTest {
+            r#type: "test_case".to_string(),
+            status: "passed".to_string(),
+            status_reason: String::new(),
+            representation: String::new(),
+            arguments: json!({}),
+            how_generated: String::new(),
+            features: json!({}),
+            coverage: Value::String("no_coverage_info".to_string()),
+            timing: json!({}),
+            metadata: json!({}),
+            property: String::new(),
+            run_start: 0.0,
+        }
+    }
+}
 
 /// Compare the behavior of the evaluator in `cedar-policy` against a custom Cedar
 /// implementation. Panics if the two do not agree. `expr` is the expression to
