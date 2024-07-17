@@ -23,7 +23,7 @@ use cedar_policy_core::extensions::Extensions;
 use smol_str::SmolStr;
 
 /// Data structure representing an authorization request
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Arbitrary)]
 pub struct Request {
     /// Principal
     pub principal: EntityUID,
@@ -53,18 +53,18 @@ impl Request {
     }
 }
 
-impl<'a> Arbitrary<'a> for Request {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let context_pairs: Vec<(SmolStr, RestrictedExpr)> = u.arbitrary()?;
-        Ok(Self {
-            principal: u.arbitrary()?,
-            action: u.arbitrary()?,
-            resource: u.arbitrary()?,
-            context: ast::Context::from_pairs(context_pairs, Extensions::all_available())
-                .map_err(Error::ContextError)?,
-        })
-    }
-}
+// impl<'a> Arbitrary<'a> for Request {
+//     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+//         let context_pairs: Vec<(SmolStr, RestrictedExpr)> = u.arbitrary()?;
+//         Ok(Self {
+//             principal: u.arbitrary()?,
+//             action: u.arbitrary()?,
+//             resource: u.arbitrary()?,
+//             context: ast::Context::from_pairs(context_pairs, Extensions::all_available())
+//                 .map_err(Error::ContextError)?,
+//         })
+//     }
+// }
 
 impl From<Request> for ast::Request {
     fn from(req: Request) -> ast::Request {

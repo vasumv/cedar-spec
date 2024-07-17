@@ -30,7 +30,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 /// Data structure representing a generated policy (or template)
-#[derive(Debug, Clone, Serialize, Arbitrary)]
+#[derive(Debug, Clone, Serialize)]
 // `GeneratedPolicy` is now a bit of a misnomer: it may have slots depending on
 // how it is generated, e.g., the `allow_slots` parameter to
 // `arbitrary_for_hierarchy()`. But as of this writing, it feels like renaming
@@ -90,7 +90,7 @@ impl GeneratedPolicy {
         } else {
             u.arbitrary()?
         };
-        let annotations = u.arbitrary()?;
+        let annotations: HashMap<AnyId, SmolStr> = u.arbitrary()?;
         let effect = u.arbitrary()?;
         let principal_constraint =
             PrincipalOrResourceConstraint::arbitrary_for_hierarchy(hierarchy, allow_slots, u)?;

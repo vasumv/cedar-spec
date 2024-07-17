@@ -26,7 +26,7 @@ use serde::Serialize;
 use std::ops::{Deref, DerefMut};
 
 /// Represents an RBAC hierarchy, ie, with no attributes
-#[derive(Debug, Clone, Arbitrary)]
+#[derive(Debug, Clone)]
 pub struct RBACHierarchy(pub Hierarchy);
 
 impl RBACHierarchy {
@@ -141,7 +141,7 @@ impl From<RBACEntity> for Entity {
 }
 
 /// Represents an RBAC policy, ie, with no `when` or `unless` clauses
-#[derive(Debug, Clone, Serialize, Arbitrary)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(transparent)]
 pub struct RBACPolicy(pub GeneratedPolicy);
 
@@ -198,7 +198,7 @@ impl std::fmt::Display for RBACPolicy {
 }
 
 /// an RBAC authorization request (that is, one with an empty context)
-#[derive(Debug, Clone, Arbitrary)]
+#[derive(Debug, Clone)]
 pub struct RBACRequest(pub Request);
 
 impl Deref for RBACRequest {
