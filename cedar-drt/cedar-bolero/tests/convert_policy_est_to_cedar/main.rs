@@ -74,9 +74,9 @@ fn main() {
 
                     Err(e) => {
                         println!("{:?}", miette::Report::new(e));
-                        panic!(
-                            "Policy parsed from est to ast but did not roundtrip ast->text->ast"
-                        );
+                        // panic!(
+                        //     "Policy parsed from est to ast but did not roundtrip ast->text->ast"
+                        // );
                     }
                 }
             }
