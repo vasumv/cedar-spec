@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+use arbitrary::{Arbitrary, Unstructured};
 use bolero::check;
 use cedar_bolero_fuzz::{check_policy_equivalence, check_policy_est_parse_bugs};
+use serde::Serialize;
 use thiserror::Error;
 
 use cedar_policy_core::{ast::PolicyID, est::FromJsonError};
@@ -29,17 +31,34 @@ enum ESTParseError {
     ESTToAST(#[from] FromJsonError),
 }
 
+/// Input expected by this fuzz target:
+/// A policy EST
+#[derive(Debug, Clone, Serialize)]
+pub struct FuzzTargetInput {
+    /// generated policy
+    pub policy: cedar_policy_core::est::Policy,
+}
+
+impl<'a> Arbitrary<'a> for FuzzTargetInput {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        let input_str: String = u.arbitrary()?;
+        let est_from_str = serde_json::from_str::<cedar_policy_core::est::Policy>(&input_str)
+            .map_err(|e| arbitrary::Error::IncorrectFormat)?;
+        Ok(FuzzTargetInput {
+            policy: est_from_str,
+        })
+    }
+}
+
 fn main() {
     check!()
-        .with_arbitrary::<String>()
-        .for_each(|est_json_str| {
-            if let Ok(ast_from_est) =
-                serde_json::from_str::<cedar_policy_core::est::Policy>(&est_json_str)
-                    .map_err(ESTParseError::from)
-                    .and_then(|est| {
-                        est.try_into_ast_template(Some(PolicyID::from_string("policy0")))
-                            .map_err(ESTParseError::from)
-                    })
+        .with_arbitrary::<FuzzTargetInput>()
+        .for_each(|input| {
+            if let Ok(ast_from_est) = input
+                .clone()
+                .policy
+                .try_into_ast_template(Some(PolicyID::from_string("policy0")))
+                .map_err(ESTParseError::from)
             {
                 let ast_from_cedar = cedar_policy_core::parser::parse_policy_template(
                     None,
