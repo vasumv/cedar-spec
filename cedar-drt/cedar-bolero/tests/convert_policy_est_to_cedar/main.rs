@@ -32,5 +32,37 @@ enum ESTParseError {
 fn main() {
     check!()
         .with_arbitrary::<cedar_policy_core::est::Policy>()
-        .for_each(|input| check_policy_est_parse_bugs(input));
+        .for_each(|input| {
+            let est_json = serde_json::to_string(&input);
+            if let Ok(est_json) = est_json {
+                if let Ok(ast_from_est) =
+                    serde_json::from_str::<cedar_policy_core::est::Policy>(&est_json)
+                        .map_err(ESTParseError::from)
+                        .and_then(|est| {
+                            est.try_into_ast_template(Some(PolicyID::from_string("policy0")))
+                                .map_err(ESTParseError::from)
+                        })
+                {
+                    let ast_from_cedar = cedar_policy_core::parser::parse_policy_template(
+                        None,
+                        &ast_from_est.to_string(),
+                    );
+
+                    match ast_from_cedar {
+                        Ok(ast_from_cedar) => {
+                            check_policy_equivalence(&ast_from_est, &ast_from_cedar);
+                        }
+
+                        Err(e) => {
+                             println!("Original json: {}", est_json);
+                             println!("Original cedar from AST: {}", &ast_from_est.to_string());
+                             println!("{:?}", miette::Report::new(e));
+                             panic!(
+                                 "Policy parsed from est to ast but did not roundtrip ast->text->ast"
+                             );
+                        }
+                    }
+                }
+            }
+        });
 }
