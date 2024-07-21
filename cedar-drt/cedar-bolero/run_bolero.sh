@@ -13,7 +13,8 @@ if [ -z "$CONFIG" ]; then
     exit 1
 fi
 
-bash ../initialize_corpus.sh convert-policy-json-to-cedar
+PATH=$PATH:/home/ubuntu/.elan/bin:/home/ubuntu/.cargo/bin
+(cd ../ && ./initialize_corpus.sh convert-policy-json-to-cedar)
 
 RESULTS_DIR="results/$BENCHMARK/$CONFIG/rep_$REP"
 CORPUS_DIR=$RESULTS_DIR/corpus
@@ -29,7 +30,6 @@ if [ "$BENCHMARK" == "raw_convert_policy_est_to_cedar"  ]; then
     rm -rf $CORPUS_DIR
     cp -r ../fuzz/corpus/convert-policy-json-to-cedar "$CORPUS_DIR"
 fi
-
 
 source ../set_env_vars.sh
 echo 'cargo bolero test $BENCHMARK --corpus-dir $CORPUS_DIR --crashes-dir $CRASHES_DIR --engine $CONFIG -T $TIME -t 30s --jobs 1 --engine-args="-rss_limit_mb=0 -print_final_stats=1 -ignore_crashes=1"'
