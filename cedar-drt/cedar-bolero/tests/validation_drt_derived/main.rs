@@ -17,7 +17,10 @@
 use arbitrary::{self, Arbitrary, Unstructured};
 use ast::PolicyID;
 use bolero::check;
-use cedar_bolero_fuzz::{dump, run_auth_test, run_eval_test, run_val_test, time_function};
+use cedar_bolero_fuzz::{
+    dump, dump_fuzz_test_case, run_auth_test, run_eval_test, run_val_test, time_function,
+    FuzzTestCase, TestCaseFormat,
+};
 use cedar_drt::utils::expr_to_est;
 use cedar_drt::*;
 use cedar_policy::{Authorizer, Request};
@@ -30,6 +33,7 @@ use cedar_policy_generators::settings::ABACSettings;
 use cedar_policy_validator::{RawName, SchemaFragment};
 use log::{debug, info};
 use serde::Serialize;
+use serde_json::json;
 use std::convert::TryFrom;
 
 /// Input expected by this fuzz target
@@ -55,12 +59,28 @@ impl<'a> Arbitrary<'a> for FuzzTargetInput {
     }
 }
 
+impl TestCaseFormat for FuzzTargetInput {
+    fn to_fuzz_test_case(&self) -> FuzzTestCase {
+        // Access the serialized expression
+        let est_policy: cedar_policy_core::est::Policy = self.policy.clone().into();
+        let representation = json!({
+            "schema": self.schema,
+            "policy": est_policy,
+        });
+        FuzzTestCase {
+            representation: representation.to_string(),
+            ..Default::default()
+        }
+    }
+}
+
 fn main() {
     check!()
         .with_arbitrary::<FuzzTargetInput>()
         .for_each(|input| {
             initialize_log();
             let def_impl = LeanDefinitionalEngine::new();
+            let mut obs_out = input.to_fuzz_test_case();
 
             // generate a schema
             if let Ok(schema) = ValidatorSchema::try_from(input.schema.clone()) {
@@ -76,6 +96,16 @@ fn main() {
                     run_val_test(&def_impl, schema, &policyset, ValidationMode::Strict)
                 });
                 info!("{}{}", TOTAL_MSG, total_dur.as_nanos());
+            } else {
+                obs_out.status = "invalid".to_string();
+                obs_out.status_reason =
+                    "schema could not be converted to ValidatorSchema".to_string();
+            }
+            if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
+                let dirname = "fuzz/observations";
+                let testname =
+                    std::env::var("FUZZ_TARGET").unwrap_or("validation-derived".to_string());
+                dump_fuzz_test_case(dirname, &testname, &obs_out)
             }
         });
 }

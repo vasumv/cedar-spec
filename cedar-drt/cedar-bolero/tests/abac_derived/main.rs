@@ -17,7 +17,10 @@
 use arbitrary::{self, Arbitrary, Unstructured};
 use ast::PolicyID;
 use bolero::check;
-use cedar_bolero_fuzz::{dump, run_auth_test, run_eval_test, time_function};
+use cedar_bolero_fuzz::{
+    dump, dump_fuzz_test_case, run_auth_test, run_eval_test, time_function, FuzzTestCase,
+    TestCaseFormat,
+};
 use cedar_drt::utils::expr_to_est;
 use cedar_drt::*;
 use cedar_policy::{Authorizer, Request};
@@ -30,6 +33,7 @@ use cedar_policy_generators::settings::ABACSettings;
 use cedar_policy_validator::SchemaFragment;
 use log::{debug, info};
 use serde::Serialize;
+use serde_json::json;
 use std::convert::TryFrom;
 
 /// Input expected by this fuzz target:
@@ -59,6 +63,23 @@ impl<'a> Arbitrary<'a> for FuzzTargetInput {
     }
 }
 
+impl TestCaseFormat for FuzzTargetInput {
+    fn to_fuzz_test_case(&self) -> FuzzTestCase {
+        // Access the serialized expression
+        let est_policy: cedar_policy_core::est::Policy = self.policy.clone().into();
+        let representation = json!({
+            "entities": self.entities,
+            "policy": est_policy,
+            // Format the requests as strings in a list
+            "requests": self.requests.iter().map(|r| format!("{}", r)).collect::<Vec<_>>(),
+        });
+        FuzzTestCase {
+            representation: representation.to_string(),
+            ..Default::default()
+        }
+    }
+}
+
 fn main() {
     check!()
         .with_arbitrary::<FuzzTargetInput>()
@@ -83,6 +104,12 @@ fn main() {
                 let (_, total_dur) =
                     time_function(|| run_auth_test(&def_impl, request, &policyset, &entities));
                 info!("{}{}", TOTAL_MSG, total_dur.as_nanos());
+            }
+            if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
+                let obs_out = input.to_fuzz_test_case();
+                let dirname = "fuzz/observations";
+                let testname = std::env::var("FUZZ_TARGET").unwrap_or("abac-derived".to_string());
+                dump_fuzz_test_case(dirname, &testname, &obs_out)
             }
         });
 }

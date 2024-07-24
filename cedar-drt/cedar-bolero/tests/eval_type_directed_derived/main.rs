@@ -16,7 +16,7 @@
 
 use arbitrary::{self, Arbitrary, Unstructured};
 use bolero::check;
-use cedar_bolero_fuzz::run_eval_test;
+use cedar_bolero_fuzz::{dump_fuzz_test_case, run_eval_test, FuzzTestCase, TestCaseFormat};
 use cedar_drt::utils::expr_to_est;
 use cedar_drt::*;
 use cedar_policy::Request;
@@ -28,6 +28,7 @@ use cedar_policy_generators::schema::{arbitrary_schematype_with_bounded_depth, S
 use cedar_policy_generators::settings::ABACSettings;
 use log::debug;
 use serde::Serialize;
+use serde_json::json;
 use std::convert::TryFrom;
 
 /// Input expected by this fuzz target:
@@ -49,6 +50,21 @@ pub struct FuzzTargetInput {
     pub request: ABACRequest,
 }
 
+impl TestCaseFormat for FuzzTargetInput {
+    fn to_fuzz_test_case(&self) -> FuzzTestCase {
+        // Access the serialized expression
+        let representation = json!({
+            "entities": self.entities,
+            "expression": self.expression,
+            "request": format!("{}", &self.request),
+        });
+        FuzzTestCase {
+            representation: representation.to_string(),
+            ..Default::default()
+        }
+    }
+}
+
 /// settings for this fuzz target
 const SETTINGS: ABACSettings = ABACSettings {
     match_types: true,
@@ -68,6 +84,7 @@ fn main() {
     check!()
         .with_arbitrary::<FuzzTargetInput>()
         .for_each(|input| {
+            let obs_out = input.to_fuzz_test_case();
             initialize_log();
             let def_impl = LeanDefinitionalEngine::new();
             debug!("expr: {}\n", input.expression);
@@ -78,6 +95,11 @@ fn main() {
                 &input.expression,
                 &input.entities,
                 SETTINGS.enable_extensions,
-            )
+            );
+            if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
+                let dirname = "fuzz/observations";
+                let testname = std::env::var("FUZZ_TARGET").unwrap_or("eval-derived".to_string());
+                dump_fuzz_test_case(dirname, &testname, &obs_out)
+            }
         });
 }

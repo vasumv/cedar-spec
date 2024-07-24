@@ -14,13 +14,20 @@
  * limitations under the License.
  */
 
+use std::path::Path;
+
 use arbitrary::{Arbitrary, Unstructured};
 use bolero::check;
-use cedar_bolero_fuzz::{check_policy_equivalence, check_policy_est_parse_bugs};
+use cedar_bolero_fuzz::{
+    check_policy_equivalence, check_policy_est_parse_bugs, dump_fuzz_test_case, FuzzTestCase,
+    TestCaseFormat,
+};
 use serde::Serialize;
+use serde_json::{json, Value};
 use thiserror::Error;
 
 use cedar_policy_core::{ast::PolicyID, est::FromJsonError};
+use std::io::Write;
 
 #[derive(miette::Diagnostic, Error, Debug)]
 enum ESTParseError {
@@ -37,6 +44,19 @@ enum ESTParseError {
 pub struct FuzzTargetInput {
     /// generated policy
     pub policy: cedar_policy_core::est::Policy,
+}
+
+impl TestCaseFormat for FuzzTargetInput {
+    fn to_fuzz_test_case(&self) -> FuzzTestCase {
+        // Access the serialized expression
+        let representation = json!({
+            "policy": self.policy,
+        });
+        FuzzTestCase {
+            representation: representation.to_string(),
+            ..Default::default()
+        }
+    }
 }
 
 impl<'a> Arbitrary<'a> for FuzzTargetInput {
@@ -56,6 +76,7 @@ fn main() {
     check!()
         .with_arbitrary::<FuzzTargetInput>()
         .for_each(|input| {
+            let mut obs_out = input.to_fuzz_test_case();
             if let Ok(ast_from_est) = input
                 .clone()
                 .policy
@@ -73,12 +94,25 @@ fn main() {
                     }
 
                     Err(e) => {
-                        println!("{:?}", miette::Report::new(e));
+                        obs_out.status = "invalid".to_string();
+                        obs_out.status_reason =
+                            "policy parsed from est to ast but did not roundtrip ast->text->ast"
+                                .to_string();
+                        // println!("{:?}", miette::Report::new(e));
                         // panic!(
                         //     "Policy parsed from est to ast but did not roundtrip ast->text->ast"
                         // );
                     }
                 }
+            } else {
+                obs_out.status = "invalid".to_string();
+                obs_out.status_reason = "est to ast conversion failed".to_string();
+            }
+            if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
+                let dirname = "fuzz/observations";
+                let testname = std::env::var("FUZZ_TARGET")
+                    .unwrap_or("convert-policy-est-to-cedar".to_string());
+                dump_fuzz_test_case(dirname, &testname, &obs_out)
             }
         });
 }
