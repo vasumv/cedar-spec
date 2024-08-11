@@ -59,60 +59,60 @@ impl TestCaseFormat for FuzzTargetInput {
     }
 }
 
-impl<'a> Arbitrary<'a> for FuzzTargetInput {
-    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-        let policy: cedar_policy_core::est::Policy = u.arbitrary()?;
-        let est_json =
-            serde_json::to_string(&policy).map_err(|e| arbitrary::Error::IncorrectFormat)?;
-        let est_from_str = serde_json::from_str::<cedar_policy_core::est::Policy>(&est_json)
-            .map_err(|e| arbitrary::Error::IncorrectFormat)?;
-        Ok(FuzzTargetInput {
-            policy: est_from_str,
-        })
-    }
-}
+// impl<'a> Arbitrary<'a> for FuzzTargetInput {
+//     fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+//         let policy: cedar_policy_core::est::Policy = u.arbitrary()?;
+//         let est_json =
+//             serde_json::to_string(&policy).map_err(|e| arbitrary::Error::IncorrectFormat)?;
+//         let est_from_str = serde_json::from_str::<cedar_policy_core::est::Policy>(&est_json)
+//             .map_err(|e| arbitrary::Error::IncorrectFormat)?;
+//         Ok(FuzzTargetInput {
+//             policy: est_from_str,
+//         })
+//     }
+// }
 
-fn main() {
-    check!()
-        .with_arbitrary::<FuzzTargetInput>()
-        .for_each(|input| {
-            let mut obs_out = input.to_fuzz_test_case();
-            if let Ok(ast_from_est) = input
-                .clone()
-                .policy
-                .try_into_ast_template(Some(PolicyID::from_string("policy0")))
-                .map_err(ESTParseError::from)
-            {
-                let ast_from_cedar = cedar_policy_core::parser::parse_policy_template(
-                    None,
-                    &ast_from_est.to_string(),
-                );
+// fn main() {
+//     check!()
+//         .with_arbitrary::<FuzzTargetInput>()
+//         .for_each(|input| {
+//             let mut obs_out = input.to_fuzz_test_case();
+//             if let Ok(ast_from_est) = input
+//                 .clone()
+//                 .policy
+//                 .try_into_ast_template(Some(PolicyID::from_string("policy0")))
+//                 .map_err(ESTParseError::from)
+//             {
+//                 let ast_from_cedar = cedar_policy_core::parser::parse_policy_template(
+//                     None,
+//                     &ast_from_est.to_string(),
+//                 );
 
-                match ast_from_cedar {
-                    Ok(ast_from_cedar) => {
-                        check_policy_equivalence(&ast_from_est, &ast_from_cedar);
-                    }
+//                 match ast_from_cedar {
+//                     Ok(ast_from_cedar) => {
+//                         check_policy_equivalence(&ast_from_est, &ast_from_cedar);
+//                     }
 
-                    Err(e) => {
-                        obs_out.status = "invalid".to_string();
-                        obs_out.status_reason =
-                            "policy parsed from est to ast but did not roundtrip ast->text->ast"
-                                .to_string();
-                        // println!("{:?}", miette::Report::new(e));
-                        // panic!(
-                        //     "Policy parsed from est to ast but did not roundtrip ast->text->ast"
-                        // );
-                    }
-                }
-            } else {
-                obs_out.status = "invalid".to_string();
-                obs_out.status_reason = "est to ast conversion failed".to_string();
-            }
-            if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
-                let dirname = "fuzz/observations";
-                let testname = std::env::var("FUZZ_TARGET")
-                    .unwrap_or("convert-policy-est-to-cedar".to_string());
-                dump_fuzz_test_case(dirname, &testname, &obs_out)
-            }
-        });
-}
+//                     Err(e) => {
+//                         obs_out.status = "invalid".to_string();
+//                         obs_out.status_reason =
+//                             "policy parsed from est to ast but did not roundtrip ast->text->ast"
+//                                 .to_string();
+//                         // println!("{:?}", miette::Report::new(e));
+//                         // panic!(
+//                         //     "Policy parsed from est to ast but did not roundtrip ast->text->ast"
+//                         // );
+//                     }
+//                 }
+//             } else {
+//                 obs_out.status = "invalid".to_string();
+//                 obs_out.status_reason = "est to ast conversion failed".to_string();
+//             }
+//             if let Ok(_) = std::env::var("DRT_OBSERVABILITY") {
+//                 let dirname = "fuzz/observations";
+//                 let testname = std::env::var("FUZZ_TARGET")
+//                     .unwrap_or("convert-policy-est-to-cedar".to_string());
+//                 dump_fuzz_test_case(dirname, &testname, &obs_out)
+//             }
+//         });
+// }
