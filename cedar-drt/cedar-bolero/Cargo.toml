@@ -38,21 +38,17 @@ incremental = false
 codegen-units = 1
 
 [[test]]
-name = "eval_type_directed_derived"
+name = "eval_type_directed"
 harness = false
 
 [[test]]
-name = "convert_policy_est_to_cedar"
+name = "convert_policy_est_to_cedar_type_directed"
 harness = false
 
 [[test]]
-name = "raw_convert_policy_est_to_cedar"
+name = "abac_type_directed"
 harness = false
 
 [[test]]
-name = "abac_derived"
-harness = false
-
-[[test]]
-name = "validation_drt_derived"
+name = "validation_drt_type_directed"
 harness = false
